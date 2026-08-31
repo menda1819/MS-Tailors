@@ -1,0 +1,96 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit real credentials. See CLAUDE.md > Secrets policy.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets.json
+**/appsettings.Development.json
+**/appsettings.Local.json
+!**/appsettings.Example.json
+*.pfx
+*.p12
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Node / Next.js (frontend/)
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/versions
+.next/
+out/
+build/
+dist/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+.eslintcache
+.vercel
+
+# ---------------------------------------------------------------------------
+# .NET (backend/)
+# ---------------------------------------------------------------------------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+project.lock.json
+project.fragment.lock.json
+.vs/
+TestResults/
+*.trx
+*.coverage
+*.coverwith
+coverlet.msbuild.json
+BenchmarkDotNet.Artifacts/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+*.swp
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# Local scratch
+# ---------------------------------------------------------------------------
+tmp/
+.tmp/
+*.local
+uploads/
