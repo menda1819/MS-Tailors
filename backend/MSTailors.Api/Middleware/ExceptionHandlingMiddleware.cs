@@ -3,6 +3,7 @@ using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using MSTailors.Application.Common.Exceptions;
+using MSTailors.Application.Media;
 
 namespace MSTailors.Api.Middleware;
 
@@ -51,6 +52,13 @@ public sealed class ExceptionHandlingMiddleware
                 Status = StatusCodes.Status404NotFound,
                 Title = "Not found",
                 Detail = notFound.Message
+            },
+
+            InvalidUploadException upload => new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "That upload was rejected",
+                Detail = upload.Message
             },
 
             ConflictException conflict => new ProblemDetails

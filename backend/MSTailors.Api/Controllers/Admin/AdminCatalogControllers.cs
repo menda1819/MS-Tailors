@@ -61,8 +61,17 @@ public sealed class AdminCategoriesController : AdminControllerBase
     public AdminCategoriesController(IAdminCatalogService catalog) => _catalog = catalog;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<CategoryDto>>> List(CancellationToken cancellationToken)
-        => Ok(await _catalog.ListCategoriesAsync(cancellationToken));
+    public async Task<ActionResult<PagedResponse<CategoryDto>>> List(
+        [FromQuery] PageRequest request, CancellationToken cancellationToken)
+        => Ok(await _catalog.ListCategoriesAsync(request, cancellationToken));
+
+    /// <summary>
+    /// Every category, unpaged. Used to populate pickers where paging would be
+    /// unhelpful — the parent selector, and the product editor's category list.
+    /// </summary>
+    [HttpGet("all")]
+    public async Task<ActionResult<IReadOnlyList<CategoryDto>>> All(CancellationToken cancellationToken)
+        => Ok(await _catalog.AllCategoriesAsync(cancellationToken));
 
     [HttpPost]
     [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status201Created)]
@@ -151,4 +160,15 @@ public sealed class AdminProductsController : AdminControllerBase
     public async Task<ActionResult<ProductDetailDto>> DeleteVariant(
         string id, string sku, CancellationToken cancellationToken)
         => Ok(await _catalog.DeleteVariantAsync(id, sku, cancellationToken));
+
+    /// <summary>
+    /// Sets absolute stock for many variants at once, across products.
+    /// Reports partial success rather than discarding a whole stock-take
+    /// because one SKU was renamed since the page loaded.
+    /// </summary>
+    [HttpPut("stock")]
+    [ProducesResponseType(typeof(BulkStockResultDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<BulkStockResultDto>> BulkStock(
+        [FromBody] BulkStockRequest request, CancellationToken cancellationToken)
+        => Ok(await _catalog.BulkUpdateStockAsync(request, cancellationToken));
 }

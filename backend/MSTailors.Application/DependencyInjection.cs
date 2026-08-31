@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminOrderService, AdminOrderService>();
         services.AddScoped<IAdminCustomerService, AdminCustomerService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+        services.AddScoped<IAdminInquiryService, AdminInquiryService>();
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly(), includeInternalTypes: true);
 

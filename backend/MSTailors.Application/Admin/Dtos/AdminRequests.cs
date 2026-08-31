@@ -146,3 +146,21 @@ public sealed record CouponDto(
     string Id, string Code, CouponType Type, decimal Value, decimal MinOrderTotal,
     decimal? MaxDiscount, int? UsageLimit, int UsedCount,
     DateTime StartsAt, DateTime ExpiresAt, bool IsActive);
+
+public sealed class BulkStockRequest
+{
+    public IReadOnlyList<BulkStockLine> Updates { get; init; } = [];
+}
+
+public sealed class BulkStockLine
+{
+    public string ProductId { get; init; } = string.Empty;
+    public string Sku { get; init; } = string.Empty;
+    public int StockQuantity { get; init; }
+}
+
+/// <summary>
+/// Partial success is reported rather than thrown: a stock-take of sixty rows
+/// should not be discarded because one SKU was renamed since the page loaded.
+/// </summary>
+public sealed record BulkStockResultDto(int UpdatedCount, IReadOnlyList<string> Problems);

@@ -4,6 +4,7 @@ using MSTailors.Application.Admin.Dtos;
 using MSTailors.Application.Common.Dtos;
 using MSTailors.Application.Customers.Dtos;
 using MSTailors.Application.Orders.Dtos;
+using MSTailors.Domain.Enums;
 
 namespace MSTailors.Api.Controllers.Admin;
 
@@ -50,8 +51,48 @@ public sealed class AdminCustomersController : AdminControllerBase
     [HttpGet]
     [ProducesResponseType(typeof(PagedResponse<AdminCustomerDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<AdminCustomerDto>>> List(
-        [FromQuery] PageRequest request, CancellationToken cancellationToken)
+        [FromQuery] AdminCustomerQueryRequest request, CancellationToken cancellationToken)
         => Ok(await _customers.ListAsync(request, cancellationToken));
+
+    /// <summary>Profile, addresses, recent orders and lifetime value on one screen.</summary>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(AdminCustomerDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminCustomerDetailDto>> Get(string id, CancellationToken cancellationToken)
+        => Ok(await _customers.GetAsync(id, cancellationToken));
+}
+
+[Route("api/admin/inquiries")]
+public sealed class AdminInquiriesController : AdminControllerBase
+{
+    private readonly IAdminInquiryService _inquiries;
+
+    public AdminInquiriesController(IAdminInquiryService inquiries) => _inquiries = inquiries;
+
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResponse<InquiryDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResponse<InquiryDto>>> List(
+        [FromQuery] InquiryQueryRequest request, CancellationToken cancellationToken)
+        => Ok(await _inquiries.ListAsync(request, cancellationToken));
+
+    /// <summary>Counts per status, for the inbox badge.</summary>
+    [HttpGet("counts")]
+    [ProducesResponseType(typeof(IReadOnlyDictionary<InquiryStatus, long>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyDictionary<InquiryStatus, long>>> Counts(
+        CancellationToken cancellationToken)
+        => Ok(await _inquiries.CountsByStatusAsync(cancellationToken));
+
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(InquiryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<InquiryDto>> Get(string id, CancellationToken cancellationToken)
+        => Ok(await _inquiries.GetAsync(id, cancellationToken));
+
+    [HttpPut("{id}/status")]
+    [ProducesResponseType(typeof(InquiryDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<InquiryDto>> UpdateStatus(
+        string id, [FromBody] UpdateInquiryStatusRequest request, CancellationToken cancellationToken)
+        => Ok(await _inquiries.UpdateStatusAsync(id, request, cancellationToken));
 }
 
 [Route("api/admin/dashboard")]

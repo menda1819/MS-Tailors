@@ -26,9 +26,18 @@ public interface IAdminOrderService
     Task<OrderDto> UpdateStatusAsync(string id, UpdateOrderStatusRequest request, string changedBy, CancellationToken cancellationToken = default);
 }
 
+public sealed class AdminCustomerQueryRequest : PageRequest
+{
+    /// <summary>Matches against name or email, case-insensitively.</summary>
+    public string? Search { get; init; }
+
+    public UserRole? Role { get; init; }
+}
+
 public interface IAdminCustomerService
 {
-    Task<PagedResponse<AdminCustomerDto>> ListAsync(PageRequest request, CancellationToken cancellationToken = default);
+    Task<PagedResponse<AdminCustomerDto>> ListAsync(AdminCustomerQueryRequest request, CancellationToken cancellationToken = default);
+    Task<AdminCustomerDetailDto> GetAsync(string id, CancellationToken cancellationToken = default);
 }
 
 public sealed class AdminOrderService : IAdminOrderService
@@ -126,13 +135,55 @@ public sealed class AdminOrderService : IAdminOrderService
 public sealed class AdminCustomerService : IAdminCustomerService
 {
     private readonly ICustomerRepository _customers;
+    private readonly IOrderRepository _orders;
 
-    public AdminCustomerService(ICustomerRepository customers) => _customers = customers;
+    public AdminCustomerService(ICustomerRepository customers, IOrderRepository orders)
+    {
+        _customers = customers;
+        _orders = orders;
+    }
 
     public async Task<PagedResponse<AdminCustomerDto>> ListAsync(
-        PageRequest request, CancellationToken cancellationToken = default)
+        AdminCustomerQueryRequest request, CancellationToken cancellationToken = default)
     {
-        var page = await _customers.PageAsync(request.Page, request.PageSize, null, cancellationToken);
+        var term = request.Search?.Trim().ToLowerInvariant();
+
+        var page = (term, request.Role) switch
+        {
+            ({ Length: > 0 }, { } role) => await _customers.PageAsync(request.Page, request.PageSize,
+                customer => customer.Role == role
+                            && (customer.Email.Contains(term) || customer.FullName.ToLower().Contains(term)),
+                cancellationToken),
+            ({ Length: > 0 }, null) => await _customers.PageAsync(request.Page, request.PageSize,
+                customer => customer.Email.Contains(term) || customer.FullName.ToLower().Contains(term),
+                cancellationToken),
+            (_, { } role) => await _customers.PageAsync(request.Page, request.PageSize,
+                customer => customer.Role == role, cancellationToken),
+            _ => await _customers.PageAsync(request.Page, request.PageSize, null, cancellationToken)
+        };
+
         return PagedResponse<AdminCustomerDto>.From(page, customer => customer.ToAdminDto());
+    }
+
+    public async Task<AdminCustomerDetailDto> GetAsync(
+        string id, CancellationToken cancellationToken = default)
+    {
+        var customer = await _customers.GetByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException("Customer", id);
+
+        var orders = await _orders.GetByCustomerAsync(id, cancellationToken);
+
+        // Cancelled and returned orders do not count toward lifetime value.
+        var billable = orders
+            .Where(order => order.OrderStatus is not (OrderStatus.Cancelled or OrderStatus.Returned))
+            .ToList();
+
+        return new AdminCustomerDetailDto(
+            customer.ToAdminDto(),
+            [.. customer.Addresses.Select(CustomerMappings.ToDto)],
+            [.. orders.Take(20).Select(order => order.ToSummary())],
+            orders.Count,
+            billable.Sum(order => order.Total),
+            "LKR");
     }
 }

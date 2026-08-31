@@ -13,6 +13,7 @@ using MSTailors.Application.Orders;
 using MSTailors.Infrastructure.Auth;
 using MSTailors.Infrastructure.Configuration;
 using MSTailors.Infrastructure.Health;
+using MSTailors.Infrastructure.Media;
 using MSTailors.Infrastructure.Persistence;
 using MSTailors.Infrastructure.Repositories;
 using MSTailors.Infrastructure.Seeding;
@@ -82,7 +83,53 @@ public static class DependencyInjection
             .ValidateDataAnnotations();
         services.AddScoped<DatabaseSeeder>();
 
+        AddMediaStorage(services, configuration);
+
         return services;
+    }
+
+    private static void AddMediaStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        services
+            .AddOptions<MediaSettings>()
+            .Bind(configuration.GetSection(MediaSettings.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        var settings = configuration.GetSection(MediaSettings.SectionName).Get<MediaSettings>()
+                       ?? new MediaSettings();
+
+        if (settings.Provider == MediaStoreProvider.ObjectStorage)
+        {
+            if (string.IsNullOrWhiteSpace(settings.ServiceUrl)
+                || string.IsNullOrWhiteSpace(settings.Bucket)
+                || string.IsNullOrWhiteSpace(settings.AccessKeyId)
+                || string.IsNullOrWhiteSpace(settings.SecretAccessKey))
+            {
+                throw new InvalidOperationException(
+                    "Media:Provider is ObjectStorage but ServiceUrl, Bucket, AccessKeyId or SecretAccessKey " +
+                    "is missing. Set them in user secrets (colon form) or environment variables (double underscore).");
+            }
+
+            services.AddSingleton<Amazon.S3.IAmazonS3>(_ => new Amazon.S3.AmazonS3Client(
+                new Amazon.Runtime.BasicAWSCredentials(settings.AccessKeyId, settings.SecretAccessKey),
+                new Amazon.S3.AmazonS3Config
+                {
+                    ServiceURL = settings.ServiceUrl,
+                    // R2 requires path-style addressing; virtual-host style
+                    // resolves to a bucket subdomain that does not exist.
+                    ForcePathStyle = true,
+                    AuthenticationRegion = settings.Region,
+                    RequestChecksumCalculation = Amazon.Runtime.RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = Amazon.Runtime.ResponseChecksumValidation.WHEN_REQUIRED
+                }));
+
+            services.AddSingleton<MSTailors.Application.Media.IMediaStore, ObjectStorageMediaStore>();
+        }
+        else
+        {
+            services.AddSingleton<MSTailors.Application.Media.IMediaStore, LocalDiskMediaStore>();
+        }
     }
 
     private static void AddRepositories(IServiceCollection services)

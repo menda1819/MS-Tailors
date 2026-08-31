@@ -230,3 +230,52 @@ public sealed class AdminOrderQueryRequestValidator : AbstractValidator<AdminOrd
             .WithMessage("The end of the range must be after the start.");
     }
 }
+
+public sealed class BulkStockLineValidator : AbstractValidator<BulkStockLine>
+{
+    public BulkStockLineValidator()
+    {
+        RuleFor(line => line.ProductId).ObjectId();
+        RuleFor(line => line.Sku).NotEmpty().MaximumLength(64);
+        RuleFor(line => line.StockQuantity).InclusiveBetween(0, 1_000_000);
+    }
+}
+
+public sealed class BulkStockRequestValidator : AbstractValidator<BulkStockRequest>
+{
+    public BulkStockRequestValidator()
+    {
+        RuleFor(request => request.Updates)
+            .NotEmpty().WithMessage("Nothing to update.")
+            // Bounded so one request cannot rewrite the whole catalogue.
+            .Must(updates => updates.Count <= 500)
+            .WithMessage("Update at most 500 variants at a time.");
+
+        RuleForEach(request => request.Updates).SetValidator(new BulkStockLineValidator());
+    }
+}
+
+public sealed class UpdateInquiryStatusRequestValidator : AbstractValidator<UpdateInquiryStatusRequest>
+{
+    public UpdateInquiryStatusRequestValidator() => RuleFor(request => request.Status).IsInEnum();
+}
+
+public sealed class InquiryQueryRequestValidator : AbstractValidator<InquiryQueryRequest>
+{
+    public InquiryQueryRequestValidator()
+    {
+        Include(new PageRequestValidator());
+        RuleFor(request => request.Status).IsInEnum().When(request => request.Status.HasValue);
+        RuleFor(request => request.ServiceNeeded).IsInEnum().When(request => request.ServiceNeeded.HasValue);
+    }
+}
+
+public sealed class AdminCustomerQueryRequestValidator : AbstractValidator<AdminCustomerQueryRequest>
+{
+    public AdminCustomerQueryRequestValidator()
+    {
+        Include(new PageRequestValidator());
+        RuleFor(request => request.Search).MaximumLength(120);
+        RuleFor(request => request.Role).IsInEnum().When(request => request.Role.HasValue);
+    }
+}

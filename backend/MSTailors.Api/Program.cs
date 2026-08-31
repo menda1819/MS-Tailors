@@ -264,10 +264,13 @@ try
     }
 
     // ---- Pipeline ----------------------------------------------------------
-    // Exception handling is first so it wraps everything downstream.
-    app.UseExceptionHandling();
-
+    // Request logging is outermost so it records the status the client actually
+    // received. Inside the exception handler it would see the exception escape
+    // and log 500 for every handled 401, 404 and 422.
     app.UseSerilogRequestLogging();
+
+    // Exception handling wraps everything downstream of it.
+    app.UseExceptionHandling();
 
     if (app.Environment.IsDevelopment())
     {
@@ -282,6 +285,28 @@ try
     {
         app.UseHsts();
         app.UseHttpsRedirection();
+    }
+
+    // Local-disk media is served straight from the uploads directory. With
+    // object storage this never runs — the CDN serves those URLs instead.
+    var mediaSettings = app.Services
+        .GetRequiredService<IOptions<MSTailors.Infrastructure.Media.MediaSettings>>().Value;
+
+    if (mediaSettings.Provider == MSTailors.Infrastructure.Media.MediaStoreProvider.LocalDisk)
+    {
+        var uploadRoot = Path.IsPathRooted(mediaSettings.LocalRootPath)
+            ? mediaSettings.LocalRootPath
+            : Path.Combine(AppContext.BaseDirectory, mediaSettings.LocalRootPath);
+
+        Directory.CreateDirectory(uploadRoot);
+
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
+            RequestPath = "/uploads",
+            OnPrepareResponse = context =>
+                context.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable"
+        });
     }
 
     app.UseCors(CorsSettings.PolicyName);

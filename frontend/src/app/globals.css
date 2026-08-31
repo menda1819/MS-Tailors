@@ -1,26 +1,213 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   MS Tailors design system.
+   Approved Phase 5. Six colours, two typefaces, a 4px grid.
+   Nothing in a component may declare a raw hex — everything comes from here.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* --- Colour ------------------------------------------------------------
+     Deep neutrals with a single accent. The greys carry a faint blue bias so
+     they relate to the indigo; sand is the one warm note and is a material
+     colour — rules, ticks and dividers, never text. */
+
+  --color-ink: #14151a;
+  --color-graphite: #2a2c34;
+  --color-slate: #585b66;
+  --color-ash: #8a8d97;
+  --color-sand: #c7bca8;
+  --color-sand-soft: #dcd7cb;
+  --color-paper: #f5f3ee;
+  --color-paper-sunk: #edeae2;
+  --color-chalk: #ffffff;
+
+  /* The accent. Primary action, links, focus ring, measure ticks. */
+  --color-indigo: #29346b;
+  --color-indigo-hover: #1e2751;
+  --color-indigo-soft: #e6e8f2;
+  /* Indigo disappears on ink, so dark grounds use a lifted tint (6.8:1). */
+  --color-indigo-lift: #8e9bd8;
+
+  /* Semantic state. Separate from the accent, and deliberately muted so a
+     dashboard full of badges does not turn into a fruit salad. */
+  --color-success: #2f6b4f;
+  --color-success-soft: #e4efe9;
+  --color-warning: #8a6a1f;
+  --color-warning-soft: #f5efe0;
+  --color-danger: #a6362b;
+  --color-danger-soft: #f7e8e6;
+
+  /* --- Type -------------------------------------------------------------- */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* --- Shape -------------------------------------------------------------
+     A cut edge, not a rounded one. Two pixels everywhere. */
+  --radius-tailored: 2px;
+
+  /* --- Elevation ---------------------------------------------------------
+     Shadows are near-invisible on purpose; separation comes from rules. */
+  --shadow-raised: 0 1px 2px rgba(20, 21, 26, 0.05), 0 8px 24px -12px rgba(20, 21, 26, 0.18);
+  --shadow-overlay: 0 12px 48px -12px rgba(20, 21, 26, 0.35);
+}
+
+/* --- Base --------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Fraunces ships playful SOFT and WONK axes. Both are dialled to zero: this
+   is a tailoring house, and the face should read precise rather than friendly. */
+.font-display,
+h1,
+h2,
+h3 {
+  font-variation-settings: "SOFT" 0, "WONK" 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}
+
+/* Digits that sit in columns — prices, stock counts, order totals — must align. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Focus --------------------------------------------------------------
+   One visible treatment everywhere. Never remove an outline without a
+   replacement; keyboard users navigate entirely by this. */
+:focus-visible {
+  outline: 2px solid var(--color-indigo);
+  outline-offset: 2px;
+  border-radius: 1px;
+}
+
+/* --- Motion -------------------------------------------------------------
+   A short fade-and-rise on entry, and nothing else. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.24s cubic-bezier(0.2, 0.6, 0.2, 1) both;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- The measure rule ---------------------------------------------------
+   The signature device: tick marks from a tailor's tape, every fifth full
+   height and in the accent. Section boundaries only. */
+.measure {
+  display: flex;
+  align-items: flex-end;
+  height: 13px;
+  overflow: hidden;
+}
+
+.measure > i {
+  display: block;
+  flex: 0 0 auto;
+  width: 1px;
+  height: 4px;
+  margin-right: 7px;
+  background-color: var(--color-sand);
+}
+
+.measure > i:nth-child(5n + 1) {
+  height: 11px;
+  background-color: var(--color-indigo);
+}
+
+/* --- Skeleton ------------------------------------------------------------ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-paper-sunk);
+  border-radius: var(--radius-tailored);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    display: none;
+  }
+}
+
+/* --- Print ---------------------------------------------------------------
+   Used by the order invoice. Chrome is hidden, the sheet fills the page. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  .print-sheet {
+    margin: 0;
+    padding: 0;
+    max-width: none;
+    box-shadow: none;
+    border: 0;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }

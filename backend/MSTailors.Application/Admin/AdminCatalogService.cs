@@ -19,7 +19,10 @@ public interface IAdminCatalogService
     Task DeleteBrandAsync(string id, CancellationToken cancellationToken = default);
 
     // Categories
-    Task<IReadOnlyList<CategoryDto>> ListCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<PagedResponse<CategoryDto>> ListCategoriesAsync(PageRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Unpaged, for populating the parent-category picker.</summary>
+    Task<IReadOnlyList<CategoryDto>> AllCategoriesAsync(CancellationToken cancellationToken = default);
     Task<CategoryDto> CreateCategoryAsync(CategoryRequest request, CancellationToken cancellationToken = default);
     Task<CategoryDto> UpdateCategoryAsync(string id, CategoryRequest request, CancellationToken cancellationToken = default);
     Task DeleteCategoryAsync(string id, CancellationToken cancellationToken = default);
@@ -35,6 +38,9 @@ public interface IAdminCatalogService
     Task<ProductDetailDto> AddVariantAsync(string productId, VariantRequest request, CancellationToken cancellationToken = default);
     Task<ProductDetailDto> UpdateVariantAsync(string productId, string sku, VariantRequest request, CancellationToken cancellationToken = default);
     Task<ProductDetailDto> DeleteVariantAsync(string productId, string sku, CancellationToken cancellationToken = default);
+
+    /// <summary>Sets absolute stock for many variants at once, across products.</summary>
+    Task<BulkStockResultDto> BulkUpdateStockAsync(BulkStockRequest request, CancellationToken cancellationToken = default);
 }
 
 public sealed class AdminCatalogService : IAdminCatalogService
@@ -138,7 +144,20 @@ public sealed class AdminCatalogService : IAdminCatalogService
 
     // ---- Categories --------------------------------------------------------
 
-    public async Task<IReadOnlyList<CategoryDto>> ListCategoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResponse<CategoryDto>> ListCategoriesAsync(
+        PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var page = await _categories.PageAsync(request.Page, request.PageSize, null, cancellationToken);
+
+        var ordered = page.Items
+            .OrderBy(category => category.DisplayOrder)
+            .ThenBy(category => category.Name)
+            .ToList();
+
+        return PagedResponse<CategoryDto>.From(page with { Items = ordered }, category => category.ToDto());
+    }
+
+    public async Task<IReadOnlyList<CategoryDto>> AllCategoriesAsync(CancellationToken cancellationToken = default)
     {
         var all = await _categories.ListAsync(cancellationToken: cancellationToken);
         return [.. all.OrderBy(category => category.DisplayOrder).Select(category => category.ToDto())];
@@ -431,6 +450,59 @@ public sealed class AdminCatalogService : IAdminCatalogService
 
     private async Task<Product> LoadProductAsync(string id, CancellationToken cancellationToken) =>
         await _products.GetByIdAsync(id, cancellationToken) ?? throw new NotFoundException("Product", id);
+
+    public async Task<BulkStockResultDto> BulkUpdateStockAsync(
+        BulkStockRequest request, CancellationToken cancellationToken = default)
+    {
+        // Grouped by product so a stock-take touching thirty variants of one
+        // product is one write, not thirty.
+        var byProduct = request.Updates
+            .GroupBy(update => update.ProductId)
+            .ToList();
+
+        var updated = 0;
+        var problems = new List<string>();
+
+        foreach (var group in byProduct)
+        {
+            var product = await _products.GetByIdAsync(group.Key, cancellationToken);
+
+            if (product is null)
+            {
+                problems.Add($"Product '{group.Key}' was not found.");
+                continue;
+            }
+
+            var touched = false;
+
+            foreach (var update in group)
+            {
+                var variant = product.Variants.FirstOrDefault(v => v.Sku == update.Sku);
+
+                if (variant is null)
+                {
+                    problems.Add($"'{product.Name}' has no variant with SKU '{update.Sku}'.");
+                    continue;
+                }
+
+                if (variant.StockQuantity == update.StockQuantity)
+                {
+                    continue;
+                }
+
+                variant.StockQuantity = update.StockQuantity;
+                touched = true;
+                updated++;
+            }
+
+            if (touched)
+            {
+                await _products.UpdateAsync(product, cancellationToken);
+            }
+        }
+
+        return new BulkStockResultDto(updated, problems);
+    }
 
     private static string Normalise(string slug) => slug.Trim().ToLowerInvariant();
 }
