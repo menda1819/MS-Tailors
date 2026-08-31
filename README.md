@@ -77,20 +77,26 @@ Secrets are **never** committed. In development they live in .NET user secrets:
 ```bash
 cd backend/MSTailors.Api
 dotnet user-secrets init
-dotnet user-secrets set "MongoDb__ConnectionString" "<your-atlas-uri>"
-dotnet user-secrets set "MongoDb__DatabaseName"     "mstailors"
-dotnet user-secrets set "Jwt__Key"                  "<a-long-random-secret>"
-dotnet user-secrets set "Jwt__Issuer"               "https://localhost:5001"
-dotnet user-secrets set "Jwt__Audience"             "mstailors-web"
-dotnet user-secrets set "Cloudinary__CloudName"     "<cloud-name>"
-dotnet user-secrets set "Cloudinary__ApiKey"        "<api-key>"
-dotnet user-secrets set "Cloudinary__ApiSecret"     "<api-secret>"
-dotnet user-secrets set "PayHere__MerchantId"       "<merchant-id>"
-dotnet user-secrets set "PayHere__MerchantSecret"   "<merchant-secret>"
+dotnet user-secrets set "MongoDb:ConnectionString" "<your-atlas-uri>"
+dotnet user-secrets set "MongoDb:DatabaseName"     "mstailors"
+dotnet user-secrets set "Jwt:Key"                  "<a-long-random-secret>"
+dotnet user-secrets set "Jwt:Issuer"               "https://localhost:5001"
+dotnet user-secrets set "Jwt:Audience"             "mstailors-web"
+dotnet user-secrets set "Cloudinary:CloudName"     "<cloud-name>"
+dotnet user-secrets set "Cloudinary:ApiKey"        "<api-key>"
+dotnet user-secrets set "Cloudinary:ApiSecret"     "<api-secret>"
+dotnet user-secrets set "PayHere:MerchantId"       "<merchant-id>"
+dotnet user-secrets set "PayHere:MerchantSecret"   "<merchant-secret>"
 ```
 
 `appsettings.Example.json` lists every key with placeholder values.
-In production these are supplied as environment variables.
+
+> **Colons here, double underscores in production.** User secrets and
+> `appsettings.json` are JSON, so the separator is `:` — `MongoDb:ConnectionString`.
+> Environment variables use `__` — `MongoDb__ConnectionString`. The `__` to `:`
+> translation is an environment-variable convention only, so
+> `dotnet user-secrets set "MongoDb__ConnectionString"` stores a literal key that
+> **silently never binds**, and the app starts as if nothing were configured.
 
 ### 3. Frontend configuration
 

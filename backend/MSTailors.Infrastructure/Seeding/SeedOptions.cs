@@ -19,7 +19,9 @@ public sealed class SeedOptions
     public string AdminEmail { get; set; } = "admin@mstailors.lk";
 
     [Required(AllowEmptyStrings = false, ErrorMessage =
-        "Seed__AdminPassword is not configured. Set it with: dotnet user-secrets set \"Seed__AdminPassword\" \"<password>\"")]
+        "Seed:AdminPassword is not configured. In development: " +
+        "dotnet user-secrets set \"Seed:AdminPassword\" \"<password>\" (note the colon). " +
+        "In production set the Seed__AdminPassword environment variable.")]
     [MinLength(12, ErrorMessage = "The seeded admin password must be at least 12 characters.")]
     public string AdminPassword { get; set; } = string.Empty;
 

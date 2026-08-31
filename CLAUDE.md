@@ -186,7 +186,16 @@ Api  ──▶ Application ──▶ Domain
 
 ### Config keys
 
-Backend (`__` is the .NET nesting separator):
+Backend. **Two spellings, not interchangeable** — user secrets and
+`appsettings.json` are JSON and use `:`; environment variables use `__`. Passing
+the `__` form to `dotnet user-secrets set` stores a literal key that never binds
+and fails silently:
+
+```
+user secrets / appsettings :  MongoDb:ConnectionString
+environment variables      :  MongoDb__ConnectionString
+```
+
 
 ```
 MongoDb__ConnectionString      MongoDb__DatabaseName          # mstailors
@@ -292,18 +301,18 @@ dotnet format
 > `PageProps` / `LayoutProps` global types into `.next/types`, so a bare
 > `tsc --noEmit` fails on a clean checkout.
 
-Setting a secret (run from `backend/MSTailors.Api`, output suppressed so the
-value is not echoed into a terminal log):
+Setting a secret (run from `backend/MSTailors.Api`; note the **colon**, and the
+output is suppressed so the value is not echoed into a terminal log):
 
 ```bash
-dotnet user-secrets set "MongoDb__ConnectionString" "<uri>" > /dev/null
+dotnet user-secrets set "MongoDb:ConnectionString" "<uri>" > /dev/null
 ```
 
 ### Seeding
 
 ```bash
 # from backend/
-dotnet user-secrets set "Seed__AdminPassword" "<password>" --project MSTailors.Api > /dev/null
+dotnet user-secrets set "Seed:AdminPassword" "<password>" --project MSTailors.Api > /dev/null
 dotnet run --project MSTailors.Api -- --seed            # idempotent; skips collections that have data
 dotnet run --project MSTailors.Api -- --seed --force    # clears seeded collections first
 ```

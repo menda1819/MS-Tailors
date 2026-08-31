@@ -6,7 +6,7 @@ import type { HealthResponse } from "@/types/health";
 /**
  * TEMPORARY — Phase 1 connectivity proof.
  *
- * Confirms Next.js -> .NET API -> MongoDB Atlas end to end. Delete this route
+ * Confirms Next.js -> .NET API -> MongoDB end to end. Delete this route
  * once real pages exist; it is noindex and must never ship to production.
  */
 
@@ -71,7 +71,7 @@ export default async function HealthPage() {
         System health
       </h1>
       <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-        Phase 1 connectivity check — Next.js to .NET API to MongoDB Atlas.
+        Phase 1 connectivity check — Next.js to .NET API to MongoDB.
       </p>
 
       {result.ok ? (
