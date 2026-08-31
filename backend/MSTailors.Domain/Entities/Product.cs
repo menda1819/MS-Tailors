@@ -82,6 +82,14 @@ public class Product : Entity
     [BsonElement("viewCount")]
     public long ViewCount { get; set; }
 
+    /// <summary>
+    /// Units sold, incremented inside the checkout transaction. Denormalised so
+    /// the "best selling" sort is an index scan rather than an aggregation over
+    /// every order on every shop page load.
+    /// </summary>
+    [BsonElement("salesCount")]
+    public long SalesCount { get; set; }
+
     [BsonElement("seoTitle")]
     [BsonIgnoreIfNull]
     public string? SeoTitle { get; set; }

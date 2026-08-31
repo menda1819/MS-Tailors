@@ -34,4 +34,14 @@ public class ProductVariant
     [BsonElement("imageUrl")]
     [BsonIgnoreIfNull]
     public string? ImageUrl { get; set; }
+
+    /// <summary>
+    /// Lets a size or colour be retired without deleting it, so historical
+    /// orders referencing the SKU still resolve.
+    /// </summary>
+    [BsonElement("isActive")]
+    public bool IsActive { get; set; } = true;
+
+    [BsonIgnore]
+    public bool InStock => IsActive && StockQuantity > 0;
 }

@@ -63,6 +63,10 @@ public sealed class MongoServerFixture : IAsyncLifetime
                 "--bind_ip 127.0.0.1",
                 "--noauth",
                 "--quiet",
+                // Transactions require a replica set. A single-node set gives
+                // the checkout path a real transactional environment without
+                // needing Atlas, and matches what production runs on.
+                $"--replSet {ReplicaSetName}",
                 // Smallest cache the engine accepts, so several test runs can
                 // coexist without competing for memory.
                 "--wiredTigerCacheSizeGB 0.25"),
@@ -71,13 +75,86 @@ public sealed class MongoServerFixture : IAsyncLifetime
             UseShellExecute = false
         }) ?? throw new InvalidOperationException($"Could not start mongod at {mongodPath}");
 
-        ConnectionString = $"mongodb://127.0.0.1:{port}/?directConnection=true";
+        // Direct connection first, so replSetInitiate can be issued before the
+        // set exists and there is anything to elect a primary from.
+        var bootstrapSettings = MongoClientSettings.FromConnectionString(
+            $"mongodb://127.0.0.1:{port}/?directConnection=true");
+        bootstrapSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(30);
+        var bootstrapClient = new MongoClient(bootstrapSettings);
 
+        Client = bootstrapClient;
+        await WaitUntilReadyAsync();
+        await InitiateReplicaSetAsync(port);
+
+        // Reconnect through the replica set so the driver routes writes to the
+        // primary and sessions/transactions are available.
+        ConnectionString = $"mongodb://127.0.0.1:{port}/?replicaSet={ReplicaSetName}&directConnection=false";
         var settings = MongoClientSettings.FromConnectionString(ConnectionString);
-        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(30);
+        settings.ServerSelectionTimeout = TimeSpan.FromSeconds(60);
         Client = new MongoClient(settings);
 
-        await WaitUntilReadyAsync();
+        await WaitForPrimaryAsync();
+    }
+
+    private const string ReplicaSetName = "rs0";
+
+    private async Task InitiateReplicaSetAsync(int port)
+    {
+        var admin = Client.GetDatabase("admin");
+
+        var config = new BsonDocument
+        {
+            { "_id", ReplicaSetName },
+            { "members", new BsonArray { new BsonDocument { { "_id", 0 }, { "host", $"127.0.0.1:{port}" } } } }
+        };
+
+        try
+        {
+            await admin.RunCommandAsync<BsonDocument>(new BsonDocument("replSetInitiate", config));
+        }
+        catch (MongoCommandException ex) when (ex.CodeName == "AlreadyInitialized")
+        {
+            // Fine — a reused data directory is already configured.
+        }
+    }
+
+    /// <summary>
+    /// Waits for the node to finish electing itself primary. Writes fail with
+    /// NotWritablePrimary until this completes, which otherwise shows up as a
+    /// flaky first test.
+    /// </summary>
+    private async Task WaitForPrimaryAsync()
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        Exception? last = null;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                var result = await Client.GetDatabase("admin")
+                    .RunCommandAsync<BsonDocument>(new BsonDocument("hello", 1));
+
+                if (result.GetValue("isWritablePrimary", false).ToBoolean())
+                {
+                    // Prove a transaction can actually start before handing the
+                    // fixture to any test.
+                    using var session = await Client.StartSessionAsync();
+                    session.StartTransaction();
+                    await session.AbortTransactionAsync();
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+            }
+
+            await Task.Delay(250);
+        }
+
+        throw new TimeoutException(
+            $"mongod did not become primary within 60 seconds. Last error: {last?.Message}. {ReadLogTail()}");
     }
 
     private async Task WaitUntilReadyAsync()

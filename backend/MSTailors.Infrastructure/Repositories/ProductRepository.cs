@@ -50,6 +50,18 @@ public sealed class ProductRepository : MongoSlugRepository<Product>, IProductRe
             clauses.Add(Filter.Eq(product => product.IsNewArrival, newArrival));
         }
 
+        if (!string.IsNullOrWhiteSpace(query.Size))
+        {
+            clauses.Add(Filter.ElemMatch(product => product.Variants,
+                variant => variant.Size == query.Size));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Color))
+        {
+            clauses.Add(Filter.ElemMatch(product => product.Variants,
+                variant => variant.Color == query.Color));
+        }
+
         if (query.InStockOnly)
         {
             // Stock lives on variants, so "in stock" means at least one variant
@@ -85,6 +97,7 @@ public sealed class ProductRepository : MongoSlugRepository<Product>, IProductRe
             ProductSort.PriceDescending => find.SortByDescending(product => product.BasePrice),
             ProductSort.NameAscending => find.SortBy(product => product.Name),
             ProductSort.MostViewed => find.SortByDescending(product => product.ViewCount),
+            ProductSort.BestSelling => find.SortByDescending(product => product.SalesCount),
             _ => find.SortByDescending(product => product.CreatedAt)
         };
 
@@ -234,6 +247,53 @@ public sealed class ProductRepository : MongoSlugRepository<Product>, IProductRe
 
         var result = await Collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<IReadOnlyList<Product>> GetRelatedAsync(
+        Product product,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        // Same brand or an overlapping category, never the product itself.
+        var filter = Filter.And(
+            NotDeleted,
+            Filter.Eq(candidate => candidate.IsActive, true),
+            Filter.Ne(candidate => candidate.Id, product.Id),
+            Filter.Or(
+                Filter.Eq(candidate => candidate.BrandId, product.BrandId),
+                Filter.AnyIn(candidate => candidate.CategoryIds, product.CategoryIds)));
+
+        return await Collection.Find(filter)
+            .SortByDescending(candidate => candidate.SalesCount)
+            .Limit(Math.Clamp(limit, 1, 24))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Product>> GetLowStockAsync(
+        int threshold,
+        CancellationToken cancellationToken = default)
+    {
+        var filter = Filter.And(
+            NotDeleted,
+            Filter.Eq(product => product.IsActive, true),
+            Filter.ElemMatch(product => product.Variants,
+                variant => variant.IsActive && variant.StockQuantity <= threshold));
+
+        return await Collection.Find(filter)
+            .SortBy(product => product.Name)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Product>> GetBestSellersAsync(
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        var filter = Filter.And(NotDeleted, Filter.Eq(product => product.IsActive, true));
+
+        return await Collection.Find(filter)
+            .SortByDescending(product => product.SalesCount)
+            .Limit(Math.Clamp(limit, 1, 50))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task IncrementViewCountAsync(string productId, CancellationToken cancellationToken = default)

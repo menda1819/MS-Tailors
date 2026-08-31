@@ -306,7 +306,27 @@ output is suppressed so the value is not echoed into a terminal log):
 
 ```bash
 dotnet user-secrets set "MongoDb:ConnectionString" "<uri>" > /dev/null
+dotnet user-secrets set "Jwt:Key" "<at-least-32-characters>" > /dev/null
+dotnet user-secrets set "Seed:AdminPassword" "<password>" > /dev/null
 ```
+
+### Local MongoDB must be a replica set
+
+Checkout wraps stock decrements and the order insert in a **MongoDB
+transaction**, and transactions require a replica set. Atlas is one already. A
+local mongod is not, so it must be started with `--replSet` and then initiated:
+
+```bash
+tools/mongodb/bin/mongod --dbpath /tmp/mstailors-db --port 27017 \
+  --bind_ip 127.0.0.1 --replSet rs0 &
+
+# mongosh is not bundled with the server download, so this does it via the driver
+dotnet run --project MSTailors.Api -- --init-replset
+```
+
+Point the connection string at it with `?replicaSet=rs0`. Against a standalone
+mongod every checkout fails with "Transaction numbers are only allowed on a
+replica set member or mongos".
 
 ### Seeding
 

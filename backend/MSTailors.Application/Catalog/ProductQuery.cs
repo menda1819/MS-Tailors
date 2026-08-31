@@ -6,7 +6,8 @@ public enum ProductSort
     PriceAscending,
     PriceDescending,
     NameAscending,
-    MostViewed
+    MostViewed,
+    BestSelling
 }
 
 /// <summary>
@@ -17,6 +18,10 @@ public sealed record ProductQuery
 {
     public string? BrandId { get; init; }
     public string? CategoryId { get; init; }
+    /// <summary>Matches products having at least one variant in this size.</summary>
+    public string? Size { get; init; }
+    /// <summary>Matches products having at least one variant in this colour.</summary>
+    public string? Color { get; init; }
     /// <summary>Free-text search across name, description and tags.</summary>
     public string? SearchTerm { get; init; }
     public decimal? MinPrice { get; init; }

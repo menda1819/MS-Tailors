@@ -14,6 +14,15 @@ public abstract class RepositoryTestBase : IAsyncLifetime
 
     protected IMongoContext Context { get; private set; } = null!;
 
+    /// <summary>The replica-set client, for code that needs sessions/transactions.</summary>
+    protected MongoDB.Driver.IMongoClient MongoClient => _server.Client;
+
+    /// <summary>Connection string of the test server, for integration hosts.</summary>
+    protected string ConnectionString => _server.ConnectionString;
+
+    /// <summary>Database this test class owns.</summary>
+    protected string DatabaseName => _databaseName;
+
     protected RepositoryTestBase(MongoServerFixture server)
     {
         _server = server;

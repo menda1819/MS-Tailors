@@ -27,6 +27,14 @@ public interface IProductRepository : ISlugRepository<Product>
     /// <summary>Returns stock after a cancellation or refund.</summary>
     Task<bool> IncrementStockAsync(string productId, string sku, int quantity, CancellationToken cancellationToken = default);
 
+    /// <summary>Products sharing the brand or a category, best sellers first.</summary>
+    Task<IReadOnlyList<Product>> GetRelatedAsync(Product product, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>Active products with at least one active variant at or below the threshold.</summary>
+    Task<IReadOnlyList<Product>> GetLowStockAsync(int threshold, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Product>> GetBestSellersAsync(int limit, CancellationToken cancellationToken = default);
+
     /// <summary>Fire-and-forget view counter. Does not touch UpdatedAt.</summary>
     Task IncrementViewCountAsync(string productId, CancellationToken cancellationToken = default);
 }

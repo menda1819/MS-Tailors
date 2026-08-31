@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using MSTailors.Application.Common.Exceptions;
 
 namespace MSTailors.Api.Middleware;
 
@@ -44,6 +45,39 @@ public sealed class ExceptionHandlingMiddleware
         var problem = exception switch
         {
             ValidationException validation => BuildValidationProblem(validation),
+
+            NotFoundException notFound => new ProblemDetails
+            {
+                Status = StatusCodes.Status404NotFound,
+                Title = "Not found",
+                Detail = notFound.Message
+            },
+
+            ConflictException conflict => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Detail = conflict.Message
+            },
+
+            AuthenticationFailedException auth => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Authentication failed",
+                Detail = auth.Message
+            },
+
+            ForbiddenException forbidden => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Forbidden",
+                Detail = forbidden.Message
+            },
+
+            // 422: the request was well-formed but cannot be satisfied by
+            // current data — out of stock, expired coupon, invalid transition.
+            BusinessRuleException rule => BuildBusinessRuleProblem(rule),
+
             OperationCanceledException => new ProblemDetails
             {
                 Status = StatusCodes.Status499ClientClosedRequest,
@@ -65,12 +99,21 @@ public sealed class ExceptionHandlingMiddleware
         problem.Type = $"https://httpstatuses.io/{problem.Status}";
         problem.Extensions["traceId"] = traceId;
 
-        _logger.LogError(
-            exception,
-            "Unhandled exception on {Method} {Path} (traceId {TraceId})",
-            context.Request.Method,
-            context.Request.Path,
-            traceId);
+        // Expected, client-caused conditions are noise at Error level. Only a
+        // genuine 5xx indicates something wrong with the server.
+        if (problem.Status >= StatusCodes.Status500InternalServerError)
+        {
+            _logger.LogError(
+                exception,
+                "Unhandled exception on {Method} {Path} (traceId {TraceId})",
+                context.Request.Method, context.Request.Path, traceId);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "{Status} on {Method} {Path}: {Detail} (traceId {TraceId})",
+                problem.Status, context.Request.Method, context.Request.Path, problem.Detail, traceId);
+        }
 
         if (context.Response.HasStarted)
         {
@@ -84,6 +127,23 @@ public sealed class ExceptionHandlingMiddleware
         context.Response.ContentType = "application/problem+json";
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions));
+    }
+
+    private static ProblemDetails BuildBusinessRuleProblem(BusinessRuleException exception)
+    {
+        var problem = new ProblemDetails
+        {
+            Status = StatusCodes.Status422UnprocessableEntity,
+            Title = "The request could not be completed",
+            Detail = exception.Message
+        };
+
+        if (exception.Details.Count > 0)
+        {
+            problem.Extensions["details"] = exception.Details;
+        }
+
+        return problem;
     }
 
     private static ValidationProblemDetails BuildValidationProblem(ValidationException exception)

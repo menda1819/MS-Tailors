@@ -9,6 +9,8 @@ using MSTailors.Application.Common.Interfaces;
 using MSTailors.Application.Common.Repositories;
 using MSTailors.Application.Orders;
 using MSTailors.Domain.Entities;
+using MSTailors.Application.Orders;
+using MSTailors.Infrastructure.Auth;
 using MSTailors.Infrastructure.Configuration;
 using MSTailors.Infrastructure.Health;
 using MSTailors.Infrastructure.Persistence;
@@ -55,9 +57,19 @@ public static class DependencyInjection
         AddRepositories(services);
 
         services.AddSingleton<MongoIndexInitializer>();
+        services.AddSingleton<ReplicaSetInitializer>();
         services.AddHostedService<MongoIndexHostedService>();
 
         services.AddSingleton<IPasswordHasher<Customer>, PasswordHasher<Customer>>();
+
+        services
+            .AddOptions<JwtSettings>()
+            .Bind(configuration.GetSection(JwtSettings.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<MSTailors.Application.Auth.ITokenService, TokenService>();
+        services.AddSingleton<MSTailors.Application.Auth.IPasswordHashingService, PasswordHashingService>();
 
         // ValidateDataAnnotations, not just Bind: without it a missing
         // Seed__AdminPassword silently seeds an admin whose password hash is
@@ -80,6 +92,8 @@ public static class DependencyInjection
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddScoped<ICartRepository, CartRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
+        services.AddScoped<MSTailors.Application.Carts.ICouponRepository, CouponRepository>();
+        services.AddScoped<IOrderTransactionStore, OrderTransactionStore>();
 
         // Everything else is served by the generic repository. Slug-backed
         // entities get the slug variant so public pages can resolve by URL.
@@ -94,8 +108,6 @@ public static class DependencyInjection
         services.AddScoped<ISlugRepository<SizeGuide>>(provider =>
             new MongoSlugRepository<SizeGuide>(Context(provider).SizeGuides));
 
-        services.AddScoped<IRepository<Coupon>>(provider =>
-            new MongoRepository<Coupon>(Context(provider).Coupons));
         services.AddScoped<IRepository<Inquiry>>(provider =>
             new MongoRepository<Inquiry>(Context(provider).Inquiries));
         services.AddScoped<IRepository<GalleryItem>>(provider =>

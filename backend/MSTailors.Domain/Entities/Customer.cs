@@ -34,6 +34,14 @@ public class Customer : Entity
     [BsonElement("emailVerified")]
     public bool EmailVerified { get; set; }
 
+    /// <summary>Lets an admin disable an account without deleting its order history.</summary>
+    [BsonElement("isActive")]
+    public bool IsActive { get; set; } = true;
+
+    [BsonElement("lastLoginAt")]
+    [BsonIgnoreIfNull]
+    public DateTime? LastLoginAt { get; set; }
+
     [BsonElement("role")]
     [BsonRepresentation(BsonType.String)]
     public UserRole Role { get; set; } = UserRole.Customer;
@@ -41,4 +49,16 @@ public class Customer : Entity
     /// <summary>Hashed refresh tokens. Expired entries are pruned on rotation.</summary>
     [BsonElement("refreshTokens")]
     public List<RefreshTokenEntry> RefreshTokens { get; set; } = [];
+
+    /// <summary>
+    /// SHA-256 of the password-reset token. Only the hash is stored, so a
+    /// database dump cannot be used to reset anyone's password.
+    /// </summary>
+    [BsonElement("passwordResetTokenHash")]
+    [BsonIgnoreIfNull]
+    public string? PasswordResetTokenHash { get; set; }
+
+    [BsonElement("passwordResetExpiresAt")]
+    [BsonIgnoreIfNull]
+    public DateTime? PasswordResetExpiresAt { get; set; }
 }
