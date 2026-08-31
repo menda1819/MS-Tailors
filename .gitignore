@@ -94,3 +94,6 @@ tmp/
 .tmp/
 *.local
 uploads/
+
+# Local MongoDB binary used by the repository tests (downloaded, never committed)
+tools/

@@ -62,7 +62,7 @@ The home page and the global nav must make both paths obvious above the fold.
 | Layer | Choice |
 |---|---|
 | Frontend | Next.js (App Router) + TypeScript + Tailwind CSS |
-| Backend | .NET Web API (latest LTS) + C# |
+| Backend | .NET 8 Web API (LTS, supported to Nov 2026) + C# |
 | Database | MongoDB Atlas via the official `MongoDB.Driver` |
 | Auth | ASP.NET Core JWT bearer + rotating refresh tokens |
 | Media | Cloudinary |
@@ -122,7 +122,12 @@ Api  ──▶ Application ──▶ Domain
 - One public type per file; file name matches the type.
 - Async everywhere for I/O; suffix `Async`; always accept and pass
   `CancellationToken`.
-- Entities are classes with `string Id` (Mongo ObjectId as string at the boundary).
+- Entities are classes with `string Id` (Mongo ObjectId as string at the
+  boundary), deriving from `Entity` (`Id`, `CreatedAt`, `UpdatedAt`, `IsDeleted`).
+- Entities carry **explicit `[BsonElement]` attributes**. Field naming is
+  declared per property, not inferred — the convention pack in
+  `MongoConventions` is only a safety net for extra-element tolerance and string
+  enums.
 - **Never expose an entity from a controller.** Request/response DTOs only,
   named `CreateProductRequest`, `ProductResponse`, `ProductListItemResponse`.
 - Validation: FluentValidation in Application, wired to the pipeline so invalid
@@ -132,10 +137,12 @@ Api  ──▶ Application ──▶ Domain
 ### Mongo
 - Collection names: lowercase plural — `brands`, `products`, `orders`.
 - Field names: `camelCase` via a global convention pack, not per-property attributes.
-- Money is stored as **integer cents (LKR)** — `priceCents`. Never `double`.
+- Money is `decimal` in C#, `Decimal128` in BSON, via
+  `[BsonRepresentation(BsonType.Decimal128)]`. Never `double`.
 - Every collection has `createdAt` / `updatedAt` (UTC).
-- Soft delete via `isDeleted` on brands and products; hard delete never runs
-  from a public endpoint.
+- **Soft delete is universal.** Every document has `isDeleted`, and every
+  repository read path filters it out automatically. `HardDeleteAsync` exists for
+  test teardown and admin repair only — never call it from a request path.
 - Indexes are declared once in `MongoIndexInitializer` and created at startup.
 
 ### TypeScript / Next.js
@@ -151,8 +158,9 @@ Api  ──▶ Application ──▶ Domain
 - Public pages use SSG/ISR where content is stable, SSR where it is not.
 
 ### Tailwind
-- Design tokens as CSS variables in `globals.css`, surfaced through
-  `tailwind.config.ts`. **No raw hex in components.**
+- **Tailwind v4** — configuration is CSS-first. There is no `tailwind.config.ts`;
+  design tokens are declared in `src/app/globals.css` under `@theme`.
+  **No raw hex in components.**
 - No arbitrary values (`w-[437px]`) unless there is a written reason.
 - Compose repeated patterns into components, not `@apply` soup.
 
@@ -261,21 +269,58 @@ horizontal scroll on the body.
 
 Filled in as the projects are scaffolded — they do not exist yet at Phase 0.
 
+Frontend runs on **http://localhost:3000**, the API on **http://localhost:5001**
+(Swagger at `/swagger`).
+
 ```bash
 # Frontend (frontend/)
-npm run dev              # dev server
+npm install
+npm run dev              # dev server        -> http://localhost:3000
 npm run build            # production build
 npm run lint             # eslint
-npm run typecheck        # tsc --noEmit
-npm test                 # unit tests
+npm run typecheck        # next typegen && tsc --noEmit
 
 # Backend (backend/)
 dotnet restore
-dotnet build
-dotnet run --project MSTailors.Api
-dotnet test
-dotnet user-secrets set "MongoDb__ConnectionString" "<value>" --project MSTailors.Api
+dotnet build MSTailors.sln
+dotnet run --project MSTailors.Api    # -> http://localhost:5001
+dotnet test MSTailors.sln
 dotnet format
+```
+
+> `npm run typecheck` runs `next typegen` first on purpose. Next 16 generates the
+> `PageProps` / `LayoutProps` global types into `.next/types`, so a bare
+> `tsc --noEmit` fails on a clean checkout.
+
+Setting a secret (run from `backend/MSTailors.Api`, output suppressed so the
+value is not echoed into a terminal log):
+
+```bash
+dotnet user-secrets set "MongoDb__ConnectionString" "<uri>" > /dev/null
+```
+
+### Seeding
+
+```bash
+# from backend/
+dotnet user-secrets set "Seed__AdminPassword" "<password>" --project MSTailors.Api > /dev/null
+dotnet run --project MSTailors.Api -- --seed            # idempotent; skips collections that have data
+dotnet run --project MSTailors.Api -- --seed --force    # clears seeded collections first
+```
+
+Seeding never runs on normal startup. It exits without starting the web host,
+and exits non-zero if `Seed__AdminPassword` is missing.
+
+### Running the tests
+
+Repository tests run against a real `mongod` started per test run, from
+`tools/mongodb/bin/mongod` (gitignored, not committed). Set
+`MSTAILORS_MONGOD_PATH` to point elsewhere. Without it those tests fail with a
+message saying exactly what is missing.
+
+```bash
+curl -sL -o /tmp/mongodb.tgz https://fastdl.mongodb.org/osx/mongodb-macos-arm64-8.3.8.tgz
+mkdir -p tools/mongodb && tar -xzf /tmp/mongodb.tgz -C tools/mongodb --strip-components=1
 ```
 
 ### Before saying work is done

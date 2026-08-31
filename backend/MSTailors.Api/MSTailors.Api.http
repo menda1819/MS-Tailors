@@ -1,0 +1,6 @@
+@MSTailors.Api_HostAddress = http://localhost:5001
+
+GET {{MSTailors.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
