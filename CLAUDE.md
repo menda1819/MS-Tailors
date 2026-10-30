@@ -67,7 +67,7 @@ The home page and the global nav must make both paths obvious above the fold.
 | Auth | ASP.NET Core JWT bearer + rotating refresh tokens |
 | Media | Cloudinary |
 | Payments | PayHere + COD |
-| Repo | monorepo — https://github.com/IT22350732/MS-Tailors.git |
+| Repo | monorepo — https://github.com/menda1819/MS-Tailors.git |
 
 **No ORM.** `MongoDB.Driver` directly, behind repository interfaces.
 **No `dotnet ef`, no migrations.** Index creation is code at startup.

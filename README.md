@@ -66,7 +66,7 @@ MS-Tailors/
 ### 1. Clone
 
 ```bash
-git clone https://github.com/IT22350732/MS-Tailors.git
+git clone https://github.com/menda1819/MS-Tailors.git
 cd MS-Tailors
 ```
 
